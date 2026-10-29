@@ -7,20 +7,12 @@ import '../../core/models/track_point.dart';
 import '../../core/utils/geo_utils.dart';
 import '../../data/route_loader.dart';
 import '../../data/tracking_repository_provider.dart';
+import '../../services/location_service.dart';
+import '../../services/tracking_service.dart';
 import '../consent/consent_dialog.dart';
 import '../map/live_map.dart';
 import '../map/live_map_view.dart';
 import '../settings/settings_screen.dart';
-
-class PassengerReporterActiveNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  void setReporterActive(bool active) => state = active;
-}
-
-final passengerReporterActiveProvider =
-    NotifierProvider<PassengerReporterActiveNotifier, bool>(PassengerReporterActiveNotifier.new);
 
 class PassengerScreen extends ConsumerStatefulWidget {
   const PassengerScreen({super.key});
@@ -33,13 +25,59 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
   LiveMapController? _mapController;
   TrackPoint? _selectedPoint;
 
+  Future<void> _handleReporterToggle(BuildContext context) async {
+    final trackingState = ref.read(trackingServiceProvider);
+
+    if (trackingState.isTracking && trackingState.activeSource == 'passenger') {
+      await ref.read(trackingServiceProvider.notifier).stopTracking();
+      return;
+    }
+
+    final hasConsent = ref.read(locationConsentProvider);
+    if (!hasConsent) {
+      final agreed = await ConsentDialog.show(context);
+      if (!agreed) return;
+    }
+
+    final success = await ref
+        .read(trackingServiceProvider.notifier)
+        .startTracking(source: 'passenger');
+
+    if (!success && context.mounted) {
+      final currentGps = ref.read(trackingServiceProvider).gpsStatus;
+      if (currentGps == GpsSignalStatus.permissionDeniedForever) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text(AppStrings.permissionDeniedTitle),
+            content: const Text(AppStrings.permissionDeniedPermanentlyMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(AppStrings.cancel),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  ref.read(locationServiceProvider).openAppSettings();
+                },
+                child: const Text(AppStrings.permissionSettingsButton),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final routeAsync = ref.watch(defaultRouteFutureProvider);
     final trackingRepo = ref.watch(trackingRepositoryProvider);
     final pointsAsync = ref.watch(activeRoutePointsStreamProvider(AppConstants.defaultRouteId));
-    final isReporterActive = ref.watch(passengerReporterActiveProvider);
+    final trackingState = ref.watch(trackingServiceProvider);
+    final isReporterActive = trackingState.isTracking && trackingState.activeSource == 'passenger';
 
     final rawPoints = pointsAsync.value ?? [];
     // Filter out expired points (> 10 minutes)
@@ -204,14 +242,7 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
                       FilledButton.icon(
                         icon: const Icon(Icons.sensors_rounded),
                         label: const Text(AppStrings.passengerReporterStart),
-                        onPressed: () async {
-                          final hasConsent = ref.read(locationConsentProvider);
-                          if (!hasConsent) {
-                            final agreed = await ConsentDialog.show(context);
-                            if (!agreed) return;
-                          }
-                          ref.read(passengerReporterActiveProvider.notifier).setReporterActive(true);
-                        },
+                        onPressed: () => _handleReporterToggle(context),
                       )
                     else
                       OutlinedButton.icon(
@@ -221,9 +252,7 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
                         ),
                         icon: const Icon(Icons.stop_circle_outlined),
                         label: const Text(AppStrings.passengerReporterStop),
-                        onPressed: () {
-                          ref.read(passengerReporterActiveProvider.notifier).setReporterActive(false);
-                        },
+                        onPressed: () => _handleReporterToggle(context),
                       ),
                     const SizedBox(height: 6),
                     Text(
