@@ -1,0 +1,66 @@
+[
+  {
+    "id": "653",
+    "name": "653 Волгоград - Реконструкция",
+    "TODO_VERIFY": true,
+    "_comment": "Placeholder coordinates for pilot route №653. Volgograd Central Bus Station <-> settlement Rekonstruktsiya. Requires real GPS trace verification.",
+    "stops": [
+      {
+        "name": "Центральный автовокзал Волгограда",
+        "lat": 48.7126,
+        "lng": 44.5126,
+        "TODO_VERIFY": true
+      },
+      {
+        "name": "Иловля (поворот / трасса Р-22)",
+        "lat": 49.3033,
+        "lng": 43.9806,
+        "TODO_VERIFY": true
+      },
+      {
+        "name": "Михайловка (развилка)",
+        "lat": 50.0600,
+        "lng": 43.2370,
+        "TODO_VERIFY": true
+      },
+      {
+        "name": "п. Реконструкция (конечная)",
+        "lat": 50.3520,
+        "lng": 44.1680,
+        "TODO_VERIFY": true
+      }
+    ],
+    "polyline": [
+      {
+        "lat": 48.7126,
+        "lng": 44.5126,
+        "TODO_VERIFY": true
+      },
+      {
+        "lat": 48.8000,
+        "lng": 44.4500,
+        "TODO_VERIFY": true
+      },
+      {
+        "lat": 49.3033,
+        "lng": 43.9806,
+        "TODO_VERIFY": true
+      },
+      {
+        "lat": 49.7800,
+        "lng": 43.6500,
+        "TODO_VERIFY": true
+      },
+      {
+        "lat": 50.0600,
+        "lng": 43.2370,
+        "TODO_VERIFY": true
+      },
+      {
+        "lat": 50.3520,
+        "lng": 44.1680,
+        "TODO_VERIFY": true
+      }
+    ]
+  }
+]
