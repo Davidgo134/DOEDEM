@@ -50,3 +50,7 @@ app.*.map.json
 # Firebase / Secrets
 google-services.json
 **/google-services.json
+
+# Local properties (API keys & Android SDK path)
+local.properties
+**/local.properties

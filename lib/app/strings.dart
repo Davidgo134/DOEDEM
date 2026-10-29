@@ -5,6 +5,11 @@ class AppStrings {
   static const String demoModeBadge = 'Демо-режим';
   static const String pilotRouteTitle = 'Маршрут №653';
 
+  // Map
+  static const String mapUnavailableNoKey = 'Карта недоступна: нет ключа';
+  static const String mapUnavailableHint = 'Укажите YANDEX_MAPKIT_API_KEY в local.properties или GitHub Secrets.';
+  static const String mapVehiclesListTitle = 'Активные маршрутки на рейсе';
+
   // Roles
   static const String roleSelectTitle = 'Кто вы?';
   static const String roleSelectSubtitle = 'Выберите вашу роль в поездке. Роль можно изменить в любой момент в настройках.';

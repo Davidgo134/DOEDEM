@@ -23,6 +23,7 @@ dependencies:
   firebase_core: ^5.1.0
   cloud_firestore: ^7.1.0
   firebase_auth: ^7.0.1
+  yandex_mapkit_lite: ^2.0.2
 
 dev_dependencies:
   flutter_test:

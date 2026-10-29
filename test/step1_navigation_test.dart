@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:marshrutka/app/strings.dart';
 import 'package:marshrutka/core/models/user_role.dart';
 import 'package:marshrutka/core/utils/preferences_service.dart';
+import 'package:marshrutka/features/passenger/passenger_screen.dart';
 import 'package:marshrutka/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,7 +49,7 @@ void main() {
     // Verify persisted
     final prefsService = PreferencesService(prefs);
     expect(prefsService.getUserRole(), UserRole.passenger);
-    expect(find.text('Passenger Screen'), findsOneWidget);
+    expect(find.byType(PassengerScreen), findsOneWidget);
   });
 
   testWidgets('Selecting Driver role navigates to Driver screen and persists role', (tester) async {
