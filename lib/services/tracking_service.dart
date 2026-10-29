@@ -7,6 +7,7 @@ import '../app/strings.dart';
 import '../core/constants.dart';
 import '../core/models/track_point.dart';
 import '../core/utils/preferences_service.dart';
+import '../data/buffer_and_logger_providers.dart';
 import '../data/tracking_repository_provider.dart';
 import 'foreground_service.dart';
 import 'location_service.dart';
@@ -57,7 +58,14 @@ class TrackingServiceNotifier extends Notifier<TrackingState> {
     ref.onDispose(() {
       _positionSub?.cancel();
     });
+    _initBufferedCount();
     return const TrackingState(isTracking: false);
+  }
+
+  Future<void> _initBufferedCount() async {
+    final buffer = ref.read(offlineBufferProvider);
+    final count = await buffer.count();
+    state = state.copyWith(bufferedPointsCount: count);
   }
 
   Future<bool> startTracking({
@@ -68,6 +76,8 @@ class TrackingServiceNotifier extends Notifier<TrackingState> {
     final locationService = ref.read(locationServiceProvider);
     final foregroundService = ref.read(foregroundServiceProvider);
     final repository = ref.read(trackingRepositoryProvider);
+    final offlineBuffer = ref.read(offlineBufferProvider);
+    final csvLogger = ref.read(csvLoggerProvider);
 
     // 1. Consent check (Russian consent required)
     if (!prefsService.hasLocationConsent()) {
@@ -116,11 +126,27 @@ class TrackingServiceNotifier extends Notifier<TrackingState> {
           gpsStatus: GpsSignalStatus.ok,
         );
 
+        // Always log to local CSV for researcher analysis (Decision 10)
+        await csvLogger.logPoint(point);
+
+        // Send to repository or buffer on failure (Decision 8)
         try {
           await repository.sendTrackPoint(point);
+
+          // If send succeeded, flush any previously buffered dead zone points
+          final currentBufferCount = await offlineBuffer.count();
+          if (currentBufferCount > 0) {
+            final buffered = await offlineBuffer.getChronologicalPoints();
+            await repository.sendBufferedPoints(buffered);
+            await offlineBuffer.removePoints(buffered);
+          }
         } catch (e) {
-          debugPrint('Error sending trackpoint to repository: $e');
+          debugPrint('Network error sending trackpoint. Buffering locally: $e');
+          await offlineBuffer.addPoint(point);
         }
+
+        final newCount = await offlineBuffer.count();
+        state = state.copyWith(bufferedPointsCount: newCount);
       },
       onError: (err) {
         state = state.copyWith(gpsStatus: GpsSignalStatus.noSignal);

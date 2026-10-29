@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/strings.dart';
 import '../../core/models/user_role.dart';
 import '../../core/utils/preferences_service.dart';
+import '../../data/buffer_and_logger_providers.dart';
 import '../consent/consent_dialog.dart';
 import '../role_select/role_controller.dart';
 
@@ -17,6 +18,7 @@ class SettingsScreen extends ConsumerWidget {
     final currentRole = ref.watch(userRoleProvider);
     final hasConsent = ref.watch(locationConsentProvider);
     final prefsService = ref.watch(preferencesServiceProvider);
+    final csvLogger = ref.watch(csvLoggerProvider);
     final deviceId = prefsService.getOrCreateDeviceId();
 
     final roleLabel = currentRole == UserRole.driver
@@ -106,17 +108,29 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
 
-          // Export CSV (will be linked to CsvLogger in step 4)
+          // Export CSV (Decision 10)
           Card(
             child: ListTile(
               leading: Icon(Icons.table_chart_outlined, color: theme.colorScheme.tertiary),
               title: const Text(AppStrings.settingsExportCsv),
               subtitle: const Text('Экспорт накопленного лога координат для анализа'),
-              onTap: () {
-                // In Step 4 this triggers CsvLogger.exportLog()
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text(AppStrings.settingsExportNoPoints)),
-                );
+              onTap: () async {
+                final count = await csvLogger.count();
+                if (count == 0) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text(AppStrings.settingsExportNoPoints)),
+                    );
+                  }
+                  return;
+                }
+
+                final shared = await csvLogger.exportLog();
+                if (shared && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text(AppStrings.settingsLogExportSuccess)),
+                  );
+                }
               },
             ),
           ),

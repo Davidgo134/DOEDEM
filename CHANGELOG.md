@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [Step 4] - Offline Buffer, CSV Trackpoint Logger & Export
+- **What works**: Append-only local file/JSON `OfflineBuffer` with chronological FIFO flushing and 2000-point capacity cap (Decision 8), preserving device UTC timestamps during intercity dead zones. `CsvLogger` recording all trackpoints to `trackpoints_log.csv` and export via `share_plus` in Settings (Decision 10). Integration into `TrackingServiceNotifier` to buffer points when disconnected and auto-flush on reconnect. 13/13 unit tests pass, 0 analyzer issues.
+- **What is untested on a real device**: Local filesystem I/O speeds on low-end eMMC Android storage under continuous GPS streaming.
+
 ## [Step 3] - Location Service, Foreground Notification Service, Driver Shift & Passenger Reporter
 - **What works**: `LocationService` with dynamic intervals (10s moving > 1 m/s, 30s stationary <= 1 m/s, LocationAccuracy.high, 10m distanceFilter), `ForegroundService` running Android foreground task with persistent notification ("Смена активна" / "Вы сообщаете о движении маршрутки") and Stop action button, `TrackingService` coordinator broadcasting real-time trackpoints to repository, Driver screen with shift toggle, live GPS signal status, buffered point counter, battery optimization tip banner, and Passenger crowdsourced reporter button. 10/10 tests passing and 0 analyzer issues.
 - **What is untested on a real device**: Real GPS satellite acquisition in deep rural dead zones of Volgograd Oblast, and background foreground service behavior under aggressive Android OEM battery managers (MIUI/OneUI).
