@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [Step 5] - Merge Logic, Stale/Expiration Rules & Unit Tests
+- **What works**: Pure Dart `mergeTrackPoints` clustering algorithm implementing Decisions 9 & 6: filters expired points (> 10 minutes), deduplicates per `deviceId` (keeping newest timestamp), merges driver and passenger points within 150 m and 60 s into ONE vehicle marker (preferring driver), clusters nearby remaining passenger reporters within 150 m and 60 s into single markers, and maintains distinct route groupings. Comprehensive test coverage (20/20 tests passing, 0 analyzer issues).
+- **What is untested on a real device**: Live multi-reporter performance with simultaneous active GPS devices broadcasting concurrently on the same segment.
+
 ## [Step 4] - Offline Buffer, CSV Trackpoint Logger & Export
 - **What works**: Append-only local file/JSON `OfflineBuffer` with chronological FIFO flushing and 2000-point capacity cap (Decision 8), preserving device UTC timestamps during intercity dead zones. `CsvLogger` recording all trackpoints to `trackpoints_log.csv` and export via `share_plus` in Settings (Decision 10). Integration into `TrackingServiceNotifier` to buffer points when disconnected and auto-flush on reconnect. 13/13 unit tests pass, 0 analyzer issues.
 - **What is untested on a real device**: Local filesystem I/O speeds on low-end eMMC Android storage under continuous GPS streaming.

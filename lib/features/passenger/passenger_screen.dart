@@ -5,6 +5,7 @@ import '../../app/strings.dart';
 import '../../core/constants.dart';
 import '../../core/models/track_point.dart';
 import '../../core/utils/geo_utils.dart';
+import '../../core/utils/merge_logic.dart';
 import '../../data/route_loader.dart';
 import '../../data/tracking_repository_provider.dart';
 import '../../services/location_service.dart';
@@ -80,8 +81,8 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
     final isReporterActive = trackingState.isTracking && trackingState.activeSource == 'passenger';
 
     final rawPoints = pointsAsync.value ?? [];
-    // Filter out expired points (> 10 minutes)
-    final activePoints = rawPoints.where((p) => !GeoUtils.isPointExpired(p)).toList();
+    // Apply merge and stale/expiry logic (Decisions 6 & 9)
+    final activePoints = mergeTrackPoints(rawPoints);
 
     return Scaffold(
       appBar: AppBar(
