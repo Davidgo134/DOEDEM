@@ -10,8 +10,8 @@ import 'yandex_live_map.dart';
 class MapKeyAvailableNotifier extends Notifier<bool> {
   @override
   bool build() {
-    const key = String.fromEnvironment('YANDEX_MAPKIT_API_KEY', defaultValue: '');
-    return key.isNotEmpty;
+    // Enabled by default on Android devices (key is loaded by MainApplication)
+    return true;
   }
 
   void forceEnableMap(bool enable) {
@@ -29,7 +29,9 @@ class LiveMap extends ConsumerWidget {
   final RouteData? route;
   final List<TrackPoint> activePoints;
   final TrackPoint? selectedPoint;
+  final RouteStop? selectedStop;
   final VehicleTapCallback? onVehicleTap;
+  final StopTapCallback? onStopTap;
   final void Function(LiveMapController controller)? onMapCreated;
 
   const LiveMap({
@@ -37,7 +39,9 @@ class LiveMap extends ConsumerWidget {
     required this.route,
     required this.activePoints,
     this.selectedPoint,
+    this.selectedStop,
     this.onVehicleTap,
+    this.onStopTap,
     this.onMapCreated,
   });
 
@@ -58,7 +62,9 @@ class LiveMap extends ConsumerWidget {
       route: route,
       activePoints: activePoints,
       selectedPoint: selectedPoint,
+      selectedStop: selectedStop,
       onVehicleTap: onVehicleTap,
+      onStopTap: onStopTap,
       onMapCreated: onMapCreated,
     );
   }

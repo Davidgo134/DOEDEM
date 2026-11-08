@@ -9,6 +9,7 @@ import 'tracking_repository.dart';
 /// the pilot route polyline. Works without network, permissions or backend.
 class LocalMockRepository implements TrackingRepository {
   final List<LatLng> polyline;
+  final bool enableSimulation;
   final StreamController<List<TrackPoint>> _controller = StreamController<List<TrackPoint>>.broadcast();
   final Map<String, TrackPoint> _dynamicPoints = {};
   Timer? _simulationTimer;
@@ -26,15 +27,19 @@ class LocalMockRepository implements TrackingRepository {
     LatLng(50.3520, 44.1680), // п. Реконструкция
   ];
 
-  LocalMockRepository({List<LatLng>? customPolyline})
-      : polyline = (customPolyline != null && customPolyline.length >= 2)
+  LocalMockRepository({
+    List<LatLng>? customPolyline,
+    this.enableSimulation = false,
+  })  : polyline = (customPolyline != null && customPolyline.length >= 2)
             ? customPolyline
             : defaultRoutePolyline {
-    _startSimulation();
+    if (enableSimulation) {
+      _startSimulation();
+    }
   }
 
   @override
-  bool get isMock => true;
+  bool get isMock => enableSimulation;
 
   void _startSimulation() {
     _simulationTimer?.cancel();

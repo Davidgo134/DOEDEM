@@ -64,7 +64,9 @@ class YandexLiveMap extends StatefulWidget {
   final RouteData? route;
   final List<TrackPoint> activePoints;
   final TrackPoint? selectedPoint;
+  final RouteStop? selectedStop;
   final VehicleTapCallback? onVehicleTap;
+  final StopTapCallback? onStopTap;
   final void Function(LiveMapController controller)? onMapCreated;
 
   const YandexLiveMap({
@@ -72,7 +74,9 @@ class YandexLiveMap extends StatefulWidget {
     required this.route,
     required this.activePoints,
     this.selectedPoint,
+    this.selectedStop,
     this.onVehicleTap,
+    this.onStopTap,
     this.onMapCreated,
   });
 
@@ -84,24 +88,37 @@ class _YandexLiveMapState extends State<YandexLiveMap> {
   YandexLiveMapController? _mapController;
 
   static const yandex.Point _volgogradCenter = yandex.Point(
-    latitude: 49.53,
-    longitude: 44.34,
+    latitude: 48.7126,
+    longitude: 44.5126,
   );
+
+  Color _parseRouteColor(String? hexString) {
+    if (hexString == null || hexString.isEmpty) return const Color(0xFF006C50);
+    try {
+      final buffer = StringBuffer();
+      if (hexString.length == 7) buffer.write('ff');
+      buffer.write(hexString.replaceFirst('#', ''));
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (_) {
+      return const Color(0xFF006C50);
+    }
+  }
 
   List<yandex.MapObject> _buildMapObjects() {
     final objects = <yandex.MapObject>[];
+    final routeColor = _parseRouteColor(widget.route?.color);
 
     // Route polyline
     if (widget.route != null && widget.route!.polyline.isNotEmpty) {
       objects.add(
         yandex.PolylineMapObject(
-          mapId: const yandex.MapObjectId('route_polyline_653'),
+          mapId: yandex.MapObjectId('route_polyline_${widget.route!.id}'),
           polyline: yandex.Polyline(
             points: widget.route!.polyline
                 .map((c) => yandex.Point(latitude: c.lat, longitude: c.lng))
                 .toList(),
           ),
-          strokeColor: const Color(0xFF006C50),
+          strokeColor: routeColor,
           strokeWidth: 4.5,
         ),
       );
@@ -109,16 +126,21 @@ class _YandexLiveMapState extends State<YandexLiveMap> {
       // Route stops
       for (int i = 0; i < widget.route!.stops.length; i++) {
         final stop = widget.route!.stops[i];
+        final isSelectedStop = widget.selectedStop?.name == stop.name;
+
         objects.add(
           yandex.CircleMapObject(
-            mapId: yandex.MapObjectId('stop_$i'),
+            mapId: yandex.MapObjectId('stop_${widget.route!.id}_$i'),
             circle: yandex.Circle(
               center: yandex.Point(latitude: stop.lat, longitude: stop.lng),
-              radius: 60.0,
+              radius: isSelectedStop ? 90.0 : 50.0,
             ),
-            fillColor: Colors.white,
-            strokeColor: const Color(0xFF006C50),
-            strokeWidth: 3.0,
+            fillColor: isSelectedStop ? routeColor : Colors.white,
+            strokeColor: routeColor,
+            strokeWidth: isSelectedStop ? 4.0 : 2.5,
+            onTap: (mapObject, targetPoint) {
+              widget.onStopTap?.call(stop);
+            },
           ),
         );
       }
@@ -153,18 +175,29 @@ class _YandexLiveMapState extends State<YandexLiveMap> {
   }
 
   @override
+  void didUpdateWidget(covariant YandexLiveMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.route != null && widget.route?.id != oldWidget.route?.id && _mapController != null) {
+      _mapController!.centerOnRoute(widget.route!);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return yandex.YandexMap(
       onMapCreated: (controller) {
         _mapController = YandexLiveMapController(controller);
         widget.onMapCreated?.call(_mapController!);
 
-        // Move to initial center
-        _mapController!.centerOnPoint(
-          _volgogradCenter.latitude,
-          _volgogradCenter.longitude,
-          zoom: 7.5,
-        );
+        if (widget.route != null) {
+          _mapController!.centerOnRoute(widget.route!);
+        } else {
+          _mapController!.centerOnPoint(
+            _volgogradCenter.latitude,
+            _volgogradCenter.longitude,
+            zoom: 10.0,
+          );
+        }
       },
       mapObjects: _buildMapObjects(),
     );

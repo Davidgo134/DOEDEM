@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/strings.dart';
 import '../../core/constants.dart';
 import '../../core/utils/preferences_service.dart';
+import '../../data/route_loader.dart';
 import '../../services/location_service.dart';
 import '../../services/tracking_service.dart';
 import '../consent/consent_dialog.dart';
+import '../passenger/route_picker_sheet.dart';
 import '../settings/settings_screen.dart';
 
 class DriverScreen extends ConsumerStatefulWidget {
@@ -49,9 +51,10 @@ class _DriverScreenState extends ConsumerState<DriverScreen> {
     }
 
     // Start shift
+    final selectedRouteId = ref.read(selectedRouteIdProvider);
     final success = await ref
         .read(trackingServiceProvider.notifier)
-        .startTracking(source: 'driver');
+        .startTracking(source: 'driver', routeId: selectedRouteId);
 
     if (!success && context.mounted) {
       final currentGps = ref.read(trackingServiceProvider).gpsStatus;
@@ -197,22 +200,33 @@ class _DriverScreenState extends ConsumerState<DriverScreen> {
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        AppStrings.driverSelectedRoute,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              AppStrings.driverSelectedRoute,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              ref.watch(selectedRouteProvider).value?.name ?? AppConstants.defaultRouteName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppConstants.defaultRouteName,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      if (!isShiftActive)
+                        OutlinedButton(
+                          onPressed: () => RoutePickerSheet.show(context),
+                          child: const Text('Сменить'),
                         ),
-                      ),
                     ],
                   ),
                 ),

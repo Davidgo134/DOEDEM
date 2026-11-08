@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/strings.dart';
-import '../../core/constants.dart';
+import '../../core/models/route_data.dart';
 import '../../core/models/track_point.dart';
 import '../../core/utils/geo_utils.dart';
 import '../../core/utils/merge_logic.dart';
 import '../../data/route_loader.dart';
 import '../../data/tracking_repository_provider.dart';
-import '../../services/location_service.dart';
-import '../../services/tracking_service.dart';
-import '../consent/consent_dialog.dart';
 import '../map/live_map.dart';
 import '../map/live_map_view.dart';
 import '../settings/settings_screen.dart';
+import 'route_details_sheet.dart';
+import 'route_picker_sheet.dart';
 
 class PassengerScreen extends ConsumerStatefulWidget {
   const PassengerScreen({super.key});
@@ -25,91 +24,84 @@ class PassengerScreen extends ConsumerStatefulWidget {
 class _PassengerScreenState extends ConsumerState<PassengerScreen> {
   LiveMapController? _mapController;
   TrackPoint? _selectedPoint;
-
-  Future<void> _handleReporterToggle(BuildContext context) async {
-    final trackingState = ref.read(trackingServiceProvider);
-
-    if (trackingState.isTracking && trackingState.activeSource == 'passenger') {
-      await ref.read(trackingServiceProvider.notifier).stopTracking();
-      return;
-    }
-
-    final hasConsent = ref.read(locationConsentProvider);
-    if (!hasConsent) {
-      final agreed = await ConsentDialog.show(context);
-      if (!agreed) return;
-    }
-
-    final success = await ref
-        .read(trackingServiceProvider.notifier)
-        .startTracking(source: 'passenger');
-
-    if (!success && context.mounted) {
-      final currentGps = ref.read(trackingServiceProvider).gpsStatus;
-      if (currentGps == GpsSignalStatus.permissionDeniedForever) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text(AppStrings.permissionDeniedTitle),
-            content: const Text(AppStrings.permissionDeniedPermanentlyMessage),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text(AppStrings.cancel),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  ref.read(locationServiceProvider).openAppSettings();
-                },
-                child: const Text(AppStrings.permissionSettingsButton),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
+  RouteStop? _selectedStop;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final routeAsync = ref.watch(defaultRouteFutureProvider);
+    final routeAsync = ref.watch(selectedRouteProvider);
+    final selectedRouteId = ref.watch(selectedRouteIdProvider);
     final trackingRepo = ref.watch(trackingRepositoryProvider);
-    final pointsAsync = ref.watch(activeRoutePointsStreamProvider(AppConstants.defaultRouteId));
-    final trackingState = ref.watch(trackingServiceProvider);
-    final isReporterActive = trackingState.isTracking && trackingState.activeSource == 'passenger';
+    final pointsAsync = ref.watch(activeRoutePointsStreamProvider(selectedRouteId));
 
     final rawPoints = pointsAsync.value ?? [];
     // Apply merge and stale/expiry logic (Decisions 6 & 9)
     final activePoints = mergeTrackPoints(rawPoints);
+    final currentRoute = routeAsync.value;
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Text(AppStrings.pilotRouteTitle),
-            if (trackingRepo.isMock) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade700,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  AppStrings.demoModeBadge,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+        titleSpacing: 0,
+        title: InkWell(
+          onTap: () => RoutePickerSheet.show(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    currentRoute != null ? '№ ${currentRoute.id}' : 'Маршрут',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ],
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    currentRoute?.name ?? AppStrings.pilotRouteTitle,
+                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down),
+                if (trackingRepo.isMock) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade700,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      AppStrings.demoModeBadge,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.swap_horiz_rounded),
+            tooltip: 'Выбрать маршрут',
+            onPressed: () => RoutePickerSheet.show(context),
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: AppStrings.settingsTitle,
@@ -125,20 +117,37 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
         children: [
           // Live Map Interface (Swappable implementation: Yandex or Fallback)
           LiveMap(
-            route: routeAsync.value,
+            route: currentRoute,
             activePoints: activePoints,
             selectedPoint: _selectedPoint,
+            selectedStop: _selectedStop,
             onVehicleTap: (point) {
               setState(() {
                 _selectedPoint = point;
+                _selectedStop = null;
               });
+            },
+            onStopTap: (stop) {
+              setState(() {
+                _selectedStop = stop;
+                _selectedPoint = null;
+              });
+              _mapController?.centerOnPoint(stop.lat, stop.lng, zoom: 14.5);
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Остановка: ${stop.name}'),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             },
             onMapCreated: (controller) {
               _mapController = controller;
             },
           ),
 
-          // Selected Vehicle Info Card (if clicked)
+          // Selected Vehicle Info Card (if tapped on vehicle)
           if (_selectedPoint != null)
             Positioned(
               top: 16,
@@ -165,7 +174,7 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Маршрутка 653 (${_selectedPoint!.isDriver ? AppStrings.passengerSourceDriver : AppStrings.passengerSourcePassenger})',
+                              'Маршрутка №${_selectedPoint!.routeId} (${_selectedPoint!.isDriver ? AppStrings.passengerSourceDriver : AppStrings.passengerSourcePassenger})',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                             const SizedBox(height: 2),
@@ -198,15 +207,15 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
           // Floating Action Buttons (Center route / vehicle)
           Positioned(
             right: 16,
-            bottom: 120,
+            bottom: 230,
             child: Column(
               children: [
                 FloatingActionButton.small(
                   heroTag: 'center_route',
                   tooltip: AppStrings.passengerCenterRoute,
                   onPressed: () {
-                    if (routeAsync.hasValue && routeAsync.value != null) {
-                      _mapController?.centerOnRoute(routeAsync.value!);
+                    if (currentRoute != null) {
+                      _mapController?.centerOnRoute(currentRoute);
                     }
                   },
                   child: const Icon(Icons.route_outlined),
@@ -218,7 +227,7 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
                     tooltip: AppStrings.passengerCenterVehicle,
                     onPressed: () {
                       final first = activePoints.first;
-                      _mapController?.centerOnPoint(first.lat, first.lng, zoom: 12.0);
+                      _mapController?.centerOnPoint(first.lat, first.lng, zoom: 13.0);
                     },
                     child: const Icon(Icons.my_location),
                   ),
@@ -226,48 +235,19 @@ class _PassengerScreenState extends ConsumerState<PassengerScreen> {
             ),
           ),
 
-          // Bottom Bar: Crowdsourced Reporter Toggle Button
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 20,
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isReporterActive)
-                      FilledButton.icon(
-                        icon: const Icon(Icons.sensors_rounded),
-                        label: const Text(AppStrings.passengerReporterStart),
-                        onPressed: () => _handleReporterToggle(context),
-                      )
-                    else
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red.shade700,
-                          side: BorderSide(color: Colors.red.shade400, width: 2),
-                        ),
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        label: const Text(AppStrings.passengerReporterStop),
-                        onPressed: () => _handleReporterToggle(context),
-                      ),
-                    const SizedBox(height: 6),
-                    Text(
-                      AppStrings.passengerReporterHint,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          // Bottom Sheet: Route Details, Schedule & Stops (like Yandex Maps Transport)
+          if (currentRoute != null)
+            RouteDetailsSheet(
+              route: currentRoute,
+              activePoints: activePoints,
+              onStopSelected: (stop) {
+                setState(() {
+                  _selectedStop = stop;
+                  _selectedPoint = null;
+                });
+                _mapController?.centerOnPoint(stop.lat, stop.lng, zoom: 14.5);
+              },
             ),
-          ),
         ],
       ),
     );

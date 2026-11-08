@@ -44,6 +44,7 @@ void main() {
   group('LocalMockRepository', () {
     test('isMock is true and emits moving simulated vehicle', () async {
       final repo = LocalMockRepository(
+        enableSimulation: true,
         customPolyline: const [
           LatLng(48.7126, 44.5126),
           LatLng(50.3520, 44.1680),

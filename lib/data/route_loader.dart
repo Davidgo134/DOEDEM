@@ -12,13 +12,30 @@ final routesFutureProvider = FutureProvider<List<RouteData>>((ref) async {
   return loader.loadRoutes();
 });
 
-final defaultRouteFutureProvider = FutureProvider<RouteData?>((ref) async {
+class SelectedRouteIdNotifier extends Notifier<String> {
+  @override
+  String build() => AppConstants.defaultRouteId;
+
+  void selectRoute(String id) {
+    state = id;
+  }
+}
+
+final selectedRouteIdProvider =
+    NotifierProvider<SelectedRouteIdNotifier, String>(SelectedRouteIdNotifier.new);
+
+final selectedRouteProvider = FutureProvider<RouteData?>((ref) async {
+  final selectedId = ref.watch(selectedRouteIdProvider);
   final routes = await ref.watch(routesFutureProvider.future);
   if (routes.isEmpty) return null;
   return routes.firstWhere(
-    (r) => r.id == AppConstants.defaultRouteId,
+    (r) => r.id == selectedId,
     orElse: () => routes.first,
   );
+});
+
+final defaultRouteFutureProvider = FutureProvider<RouteData?>((ref) async {
+  return ref.watch(selectedRouteProvider.future);
 });
 
 class RouteLoader {

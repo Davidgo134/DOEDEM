@@ -2,6 +2,7 @@ import '../../core/models/route_data.dart';
 import '../../core/models/track_point.dart';
 
 typedef VehicleTapCallback = void Function(TrackPoint point);
+typedef StopTapCallback = void Function(RouteStop stop);
 
 /// Controller abstraction so feature screens can command the map
 /// without depending on the underlying map SDK.

@@ -62,6 +62,9 @@ class RouteCoord {
 class RouteData {
   final String id;
   final String name;
+  final String? description;
+  final String? type;
+  final String? color;
   final List<RouteStop> stops;
   final List<RouteCoord> polyline;
   final bool? todoVerify;
@@ -69,15 +72,33 @@ class RouteData {
   const RouteData({
     required this.id,
     required this.name,
+    this.description,
+    this.type,
+    this.color,
     required this.stops,
     required this.polyline,
     this.todoVerify,
   });
 
+  String get originName {
+    if (stops.isNotEmpty) return stops.first.name;
+    final parts = name.split('-');
+    return parts.first.trim();
+  }
+
+  String get destinationName {
+    if (stops.length > 1) return stops.last.name;
+    final parts = name.split('-');
+    return parts.length > 1 ? parts.last.trim() : name;
+  }
+
   factory RouteData.fromJson(Map<String, dynamic> json) {
     return RouteData(
       id: json['id'] as String,
       name: json['name'] as String,
+      description: json['description'] as String?,
+      type: json['type'] as String?,
+      color: json['color'] as String?,
       stops: (json['stops'] as List<dynamic>?)
               ?.map((e) => RouteStop.fromJson(e as Map<String, dynamic>))
               .toList() ??
