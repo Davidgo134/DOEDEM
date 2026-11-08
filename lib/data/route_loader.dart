@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants.dart';
 import '../core/models/route_data.dart';
+import '../services/osrm_routing_service.dart';
 
 final routeLoaderProvider = Provider<RouteLoader>((ref) => RouteLoader());
 
@@ -28,10 +29,27 @@ final selectedRouteProvider = FutureProvider<RouteData?>((ref) async {
   final selectedId = ref.watch(selectedRouteIdProvider);
   final routes = await ref.watch(routesFutureProvider.future);
   if (routes.isEmpty) return null;
-  return routes.firstWhere(
+  final route = routes.firstWhere(
     (r) => r.id == selectedId,
     orElse: () => routes.first,
   );
+
+  // If polyline is missing or empty, dynamically compute it using OSRM
+  if (route.polyline.isEmpty && route.stops.length >= 2) {
+    try {
+      final generatedPolyline = await OsrmRoutingService.fetchRoadGeometry(
+        route.stops,
+        cacheKey: route.id,
+      );
+      if (generatedPolyline.isNotEmpty) {
+        return route.copyWith(polyline: generatedPolyline);
+      }
+    } catch (_) {
+      // Fallback to existing route
+    }
+  }
+
+  return route;
 });
 
 final defaultRouteFutureProvider = FutureProvider<RouteData?>((ref) async {

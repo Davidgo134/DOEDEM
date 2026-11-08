@@ -80,6 +80,28 @@ class RouteData {
     this.todoVerify,
   });
 
+  RouteData copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? type,
+    String? color,
+    List<RouteStop>? stops,
+    List<RouteCoord>? polyline,
+    bool? todoVerify,
+  }) {
+    return RouteData(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      type: type ?? this.type,
+      color: color ?? this.color,
+      stops: stops ?? this.stops,
+      polyline: polyline ?? this.polyline,
+      todoVerify: todoVerify ?? this.todoVerify,
+    );
+  }
+
   String get originName {
     if (stops.isNotEmpty) return stops.first.name;
     final parts = name.split('-');
