@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: doedem-transit-server
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --production
+    startCommand: node index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production

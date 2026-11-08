@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/strings.dart';
+import '../../core/constants.dart';
 import '../../core/models/user_role.dart';
 import '../../core/utils/preferences_service.dart';
 import '../../data/buffer_and_logger_providers.dart';
+import '../../data/tracking_repository_provider.dart';
+import '../../data/websocket_tracking_repository.dart';
 import '../consent/consent_dialog.dart';
 import '../role_select/role_controller.dart';
 
@@ -82,6 +85,64 @@ class SettingsScreen extends ConsumerWidget {
                 },
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+
+          // Real-time WebSocket Server (Render.com)
+          Consumer(
+            builder: (context, ref, _) {
+              final wsStatus = ref.watch(wsConnectionStatusStreamProvider).value ??
+                  WsConnectionStatus.disconnected;
+              final wsUrl = prefsService.getWebSocketUrl();
+
+              final statusColor = wsStatus == WsConnectionStatus.connected
+                  ? Colors.green
+                  : wsStatus == WsConnectionStatus.connecting
+                      ? Colors.amber
+                      : Colors.orange;
+
+              final statusText = wsStatus == WsConnectionStatus.connected
+                  ? '● Подключено (онлайн)'
+                  : wsStatus == WsConnectionStatus.connecting
+                      ? '○ Подключение к серверу...'
+                      : '✕ Сервер не подключен';
+
+              return Card(
+                child: ListTile(
+                  leading: Icon(
+                    Icons.cloud_sync_rounded,
+                    color: statusColor,
+                    size: 32,
+                  ),
+                  title: const Text('Сервер синхронизации (Render.com)'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        wsUrl,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.edit_rounded),
+                    tooltip: 'Настроить адрес сервера',
+                    onPressed: () => _showWebSocketUrlDialog(context, ref, prefsService),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -166,5 +227,73 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _showWebSocketUrlDialog(
+    BuildContext context,
+    WidgetRef ref,
+    PreferencesService prefsService,
+  ) async {
+    final currentUrl = prefsService.getWebSocketUrl();
+    final controller = TextEditingController(text: currentUrl);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Сервер синхронизации'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Укажите WebSocket URL вашего сервера на Render.com:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'URL сервера',
+                hintText: 'wss://doedem-transit-server.onrender.com/ws',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Пример: wss://doedem-server.onrender.com/ws\nПоддерживаются wss://, ws:// и https://.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              controller.text = AppConstants.defaultWebSocketUrl;
+            },
+            child: const Text('По умолчанию'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.trim().isNotEmpty) {
+      final normalized = WebSocketTrackingRepository.normalizeWsUrl(result);
+      await prefsService.setWebSocketUrl(normalized);
+      ref.read(webSocketTrackingRepositoryProvider)?.updateUrl(normalized);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('URL сервера сохранён: $normalized')),
+        );
+      }
+    }
   }
 }

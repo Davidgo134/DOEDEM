@@ -56,4 +56,12 @@ class PreferencesService {
   Future<void> setBatteryBannerDismissed(bool value) async {
     await _prefs.setBool(AppConstants.prefKeyBatteryBannerDismissed, value);
   }
+
+  String getWebSocketUrl() {
+    return _prefs.getString(AppConstants.prefKeyWebSocketUrl) ?? AppConstants.defaultWebSocketUrl;
+  }
+
+  Future<void> setWebSocketUrl(String url) async {
+    await _prefs.setString(AppConstants.prefKeyWebSocketUrl, url.trim());
+  }
 }

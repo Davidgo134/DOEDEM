@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """
 Convert official Yandex Maps Masstransit lines to DOEDEM routes.json.
-Extracts:
-1. Exact official stops in order (with names and lat/lng)
-2. Exact official road polylines from activeThread
+Now includes ALL 6 ROUTES (174, 123, 160, 260, 3с, 653) directly from official Yandex Maps!
 """
 import json
 import os
@@ -38,6 +36,12 @@ ROUTE_DEFS = [
         "id": "3с",
         "color": "#D84315",
         "type": "Городской"
+    },
+    {
+        "file_id": "653",
+        "id": "653",
+        "color": "#006C50",
+        "type": "Пригородный"
     }
 ]
 
@@ -52,15 +56,11 @@ def parse_yandex_file(filepath):
     stops = []
     polyline = []
     
-    # In Yandex Maps activeThread:
-    # Items with 'coordinates' and 'name' are STOPS
-    # Items with 'points' are POLYLINES between stops
     for item in features:
         if 'coordinates' in item and 'name' in item:
             name = item.get('name', '')
             coords = item.get('coordinates', [])
             if len(coords) >= 2:
-                # coords are [lng, lat]
                 stops.append({
                     "name": name,
                     "lat": round(coords[1], 6),
@@ -75,17 +75,14 @@ def parse_yandex_file(filepath):
                         "lng": round(p[0], 6)
                     })
                     
-    # Deduplicate consecutive polyline points
     deduped_poly = []
     for p in polyline:
         if not deduped_poly or deduped_poly[-1]['lat'] != p['lat'] or deduped_poly[-1]['lng'] != p['lng']:
             deduped_poly.append(p)
             
-    # If no polyline points were in 'points' segments, fall back to stop coords
     if not deduped_poly and stops:
         deduped_poly = [{"lat": s["lat"], "lng": s["lng"]} for s in stops]
         
-    # Get thread metadata
     thread_meta = active_thread.get('properties', {}).get('ThreadMetaData', {})
     essential_stops = thread_meta.get('EssentialStops', [])
     from_name = stops[0]['name'] if stops else ''
@@ -135,16 +132,6 @@ def main():
         }
         final_routes.append(route_obj)
         
-    # Keep 653 as well if present
-    if os.path.exists(r"c:\Users\David\Pictures\DOEDEM\assets\routes.json"):
-        with open(r"c:\Users\David\Pictures\DOEDEM\assets\routes.json", "r", encoding="utf-8") as f:
-            old_routes = json.load(f)
-            for old_r in old_routes:
-                if old_r["id"] == "653":
-                    final_routes.append(old_r)
-                    break
-                    
-    # Write to assets/routes.json
     out_path = r"c:\Users\David\Pictures\DOEDEM\assets\routes.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(final_routes, f, ensure_ascii=False, indent=2)

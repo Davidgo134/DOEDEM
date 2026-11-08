@@ -30,6 +30,10 @@ class AppConstants {
   static const String prefKeyDeviceId = 'marshrutka_device_id';
   static const String prefKeyLocationConsent = 'marshrutka_location_consent';
   static const String prefKeyBatteryBannerDismissed = 'marshrutka_battery_banner_dismissed';
+  static const String prefKeyWebSocketUrl = 'marshrutka_websocket_url';
+
+  // WebSocket Server Configuration (Render.com)
+  static const String defaultWebSocketUrl = 'wss://doedem-transit-server.onrender.com/ws';
 
   // Storage filenames
   static const String offlineBufferFileName = 'offline_points_buffer.json';
