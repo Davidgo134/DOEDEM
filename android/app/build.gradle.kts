@@ -57,3 +57,11 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("com.yandex.android:maps.mobile:4.4.0-lite")
+}
+
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}

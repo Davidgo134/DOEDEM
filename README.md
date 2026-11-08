@@ -1,17 +1,89 @@
-# marshrutka
+# Маршрутка (MVP Прототип)
 
-A new Flutter project.
+Мобильное приложение для отслеживания движения пригородных маршрутных такси Волгоградской области в реальном времени.
 
-## Getting Started
+**Пилотный маршрут:** №653 «Центральный автовокзал Волгограда ↔ п. Реконструкция».
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## Возможности
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- **Выбор роли при первом запуске:**
+  - **Пассажир:** просмотр положения маршруток на карте, отображение времени последнего обновления («обновлено N сек назад»), статуса источника (водитель / пассажир), а также кнопка народного репортера «Я еду в этой маршрутке».
+  - **Водитель:** экран смены («Начать смену» / «Закончить смену»), статус сигнала GPS, индикатор накопленных в офлайн-буфере точек, напоминание о настройке энергосбережения для непрерывной работы при выключенном экране.
+- **Офлайн-буферизация (Decision 8):** при отсутствии связи (глухие зоны на междугородней трассе) координаты сохраняются в локальный буфер (до 2000 точек) с оригинальным UTC-временем устройства и автоматически отправляются в хронологическом порядке при появлении сети.
+- **Лог трекпоинтов для анализа (Decision 10):** запись всех точек в локальный CSV-файл с возможностью экспорта через системный диалог «Поделиться».
+- **Слияние репортеров (Decision 9):** если координаты водителя и пассажиров находятся в радиусе 150 м и с разницей не более 60 с, они объединяются в один маркер с приоритетом водителя.
+- **Фоновая служба (Decision 5 & 13):** Android Foreground Service с постоянным уведомлением и кнопкой остановки трансляции.
+- **Абстракция карты (`LiveMap`):** код приложения изолирован от конкретного картографического SDK. Поддерживается `yandex_mapkit_lite` с автоматическим переключением на экран-заглушку («Карта недоступна: нет ключа» + интерактивный список маршруток), если API-ключ не задан.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+## Архитектура проекта
+
+```
+lib/
+  main.dart                           # Точка входа, инициализация SharedPreferences и Firebase
+  app/
+    router.dart                       # Роутер по ролям (Пассажир / Водитель / Выбор роли)
+    strings.dart                      # Все пользовательские строки на русском языке
+    theme.dart                        # Material 3 тема (светлая/темная) с крупными тач-таргетами
+  core/
+    constants.dart                    # Константы приложения (интервалы, пороги, тайминги)
+    models/                           # RouteData, TrackPoint, UserRole
+    utils/                            # GeoUtils, PreferencesService, MergeLogic
+  data/
+    tracking_repository.dart          # Интерфейс репозитория геолокации
+    local_mock_repository.dart        # Встроенная симуляция маршрутки (по умолчанию)
+    firestore_repository.dart         # Реальный бэкенд Firebase Firestore
+    tracking_repository_provider.dart # Автоматический фоллбэк на мок при отсутствии Firebase
+    route_loader.dart                 # Загрузка assets/routes.json
+    offline_buffer.dart               # Офлайн-буфер (до 2000 точек, FIFO)
+    csv_logger.dart                   # Логирование в CSV и экспорт
+  features/
+    consent/                          # Диалог согласия на сбор геолокации
+    role_select/                      # Экран выбора роли
+    driver/                           # Экран водителя (смена, статус, батарея)
+    passenger/                        # Экран пассажира (карта, репортер)
+    settings/                         # Настройки, смена роли, экспорт CSV, ID устройства
+    map/                              # Абстракция карты (LiveMap, YandexLiveMap, FallbackLiveMap)
+  services/
+    location_service.dart             # Адаптивный опрос GPS (10с в движении, 30с на месте)
+    foreground_service.dart           # Фоновая служба и уведомление с кнопкой "Остановить"
+    tracking_service.dart             # Координатор трансляции
+```
+
+---
+
+## Как подключить Яндекс Карты (Yandex MapKit)
+
+1. Получите API-ключ MapKit в [Кабинете разработчика Яндекса](https://developer.tech.yandex.ru/).
+2. Создайте локальный файл `android/local.properties` (он уже добавлен в `.gitignore` и никогда не попадет в Git):
+   ```properties
+   YANDEX_MAPKIT_API_KEY=ваш_ключ_здесь
+   ```
+3. При сборке в GitHub Actions ключ передается через Secret `YANDEX_MAPKIT_API_KEY`.
+4. Если ключ отсутствует, приложение **не падает**, а отображает информативный экран со списком активных маршруток.
+
+---
+
+## Как подключить Firebase (Firestore Backend)
+
+По умолчанию приложение работает в **Демо-режиме (`LocalMockRepository`)** без необходимости настройки облачного сервера. Симулированная маршрутка движется по полилинии рейса №653.
+
+Чтобы подключить реальный Firestore:
+
+1. Создайте проект в [Firebase Console](https://console.firebase.google.com/).
+2. Включите **Authentication** и активируйте способ входа **Анонимный (Anonymous)**.
+3. Включите **Cloud Firestore** в режиме Production.
+4. Разверните правила безопасности из файла `firestore.rules`:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+5. Зарегистрируйте Android-приложение с package name `ru.marshrutka.marshrutka`.
+6. Скачайте файл конфигурации `google-services.json` и поместите его в папку:
+   ```
+   android/app/google-services.json
+   ```
+   *(Файл `google-services.json` внесен в `.gitignore` и не должен попадать в репозиторий).*
+7. Перезапустите приложение. Приложение автоматически обнаружит конфигурацию, бейдж «Демо-режим» исчезнет, и координаты начнут транслироваться в коллекцию `live/{deviceId}` с временем жизни `ttl = ts + 24ч`.
