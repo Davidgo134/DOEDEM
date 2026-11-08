@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""
+Generate smooth road-following polylines for routes using OSRM.
+Works for any city and any list of stops.
+"""
+import json
+import time
+import requests
+
+ROUTES = [
+    {
+        "id": "174",
+        "name": "174 ТРЦ Акварель - Площадь Ленина (Песчанка)",
+        "type": "Городской",
+        "description": "Интервал 7-10 мин, с 06:00 до 22:00. Самый популярный маршрут через Университетский пр. и Вторую Продольную",
+        "color": "#00897B",
+        "stops": [
+            {"name": "ТРЦ «Акварель»", "lat": 48.6367, "lng": 44.4361},
+            {"name": "ВолГУ", "lat": 48.6420, "lng": 44.4320},
+            {"name": "Кардиоцентр", "lat": 48.6465, "lng": 44.4285},
+            {"name": "Янтарный город", "lat": 48.6520, "lng": 44.4380},
+            {"name": "Обувная фабрика", "lat": 48.6720, "lng": 44.4600},
+            {"name": "Зелёное кольцо", "lat": 48.6790, "lng": 44.4650},
+            {"name": "Колледж нефти и газа", "lat": 48.6850, "lng": 44.4690},
+            {"name": "Стадион «Нефтяник»", "lat": 48.6890, "lng": 44.4740},
+            {"name": "ВолГАУ (СХИ)", "lat": 48.6940, "lng": 44.4790},
+            {"name": "Сельхозтехника", "lat": 48.6980, "lng": 44.4840},
+            {"name": "Елисеева", "lat": 48.7020, "lng": 44.4890},
+            {"name": "Школа № 48 (Кузнецкая)", "lat": 48.7045, "lng": 44.4940},
+            {"name": "Гостиница «Южная»", "lat": 48.7025, "lng": 44.5020},
+            {"name": "Торговый центр (Ворошиловский)", "lat": 48.7020, "lng": 44.5050},
+            {"name": "Площадь Чекистов", "lat": 48.7040, "lng": 44.5120},
+            {"name": "Краснознаменская", "lat": 48.7065, "lng": 44.5165},
+            {"name": "Комсомольская", "lat": 48.7095, "lng": 44.5220},
+            {"name": "Порт-Саида", "lat": 48.7140, "lng": 44.5265},
+            {"name": "Площадь Ленина", "lat": 48.7209, "lng": 44.5329}
+        ]
+    },
+    {
+        "id": "123",
+        "name": "123 Волгоград (Ж/Д Вокзал) - Волжский (30 мкр)",
+        "type": "Пригородный",
+        "description": "Интервал 10-15 мин, с 06:00 до 22:00. Экспресс через Первую Продольную и Волжскую ГЭС",
+        "color": "#1565C0",
+        "stops": [
+            {"name": "Ж/Д Вокзал Волгоград-1", "lat": 48.7128, "lng": 44.5132},
+            {"name": "Площадь Ленина (метротрам)", "lat": 48.7282, "lng": 44.5312},
+            {"name": "Мамаев Курган", "lat": 48.7460, "lng": 44.5460},
+            {"name": "Дворец Спорта", "lat": 48.7560, "lng": 44.5500},
+            {"name": "Площадь Возрождения", "lat": 48.7650, "lng": 44.5560},
+            {"name": "Завод «Красный Октябрь»", "lat": 48.7750, "lng": 44.5680},
+            {"name": "Тракторный завод (ВгТЗ)", "lat": 48.8020, "lng": 44.5990},
+            {"name": "Спартановка (ул. Грамши)", "lat": 48.8250, "lng": 44.6280},
+            {"name": "Волжская ГЭС (плотина)", "lat": 48.8310, "lng": 44.6720},
+            {"name": "г. Волжский (пл. Строителей)", "lat": 48.8180, "lng": 44.7350},
+            {"name": "г. Волжский (пл. Ленина)", "lat": 48.8020, "lng": 44.7550},
+            {"name": "г. Волжский (30 микрорайон)", "lat": 48.7650, "lng": 44.7850}
+        ]
+    },
+    {
+        "id": "160",
+        "name": "160 Волгоград (Тулака) - Волжский (7 мкр)",
+        "type": "Пригородный",
+        "description": "Интервал 12-15 мин, с 06:30 до 21:30. Через Ворошиловский, Центральный район и ГЭС",
+        "color": "#E65100",
+        "stops": [
+            {"name": "микрорайон Тулака (конечная)", "lat": 48.6780, "lng": 44.4750},
+            {"name": "ТЮЗ (Ворошиловский район)", "lat": 48.6930, "lng": 44.4980},
+            {"name": "Торговый Центр (Ворошиловский)", "lat": 48.7020, "lng": 44.5050},
+            {"name": "Аллея Героев (Центр)", "lat": 48.7065, "lng": 44.5165},
+            {"name": "Стадион «Волгоград Арена»", "lat": 48.7340, "lng": 44.5480},
+            {"name": "Спартановка (ул. Н. Отрады)", "lat": 48.8250, "lng": 44.6280},
+            {"name": "Волжская ГЭС", "lat": 48.8310, "lng": 44.6720},
+            {"name": "г. Волжский (7 микрорайон)", "lat": 48.8050, "lng": 44.7420}
+        ]
+    },
+    {
+        "id": "260",
+        "name": "260 Волгоград (Кардиоцентр) - Волжский (37 мкр)",
+        "type": "Пригородный",
+        "description": "Интервал 15-20 мин. Экспресс по Второй Продольной магистрали",
+        "color": "#6A1B9A",
+        "stops": [
+            {"name": "Кардиоцентр (Советский район)", "lat": 48.6380, "lng": 44.4250},
+            {"name": "ВолГУ (Университет)", "lat": 48.6420, "lng": 44.4320},
+            {"name": "Нефтяной техникум", "lat": 48.6650, "lng": 44.4480},
+            {"name": "Кинотеатр «Родина»", "lat": 48.7080, "lng": 44.4910},
+            {"name": "Белый Аист (Вторая Продольная)", "lat": 48.7210, "lng": 44.5050},
+            {"name": "Ул. Менделеева (Красный Октябрь)", "lat": 48.7680, "lng": 44.5420},
+            {"name": "Спартановка (ул. Грамши)", "lat": 48.8250, "lng": 44.6280},
+            {"name": "г. Волжский (37 микрорайон)", "lat": 48.7520, "lng": 44.7920}
+        ]
+    },
+    {
+        "id": "3c",
+        "name": "3с Кировский (ул. Кирова) - ТРК Мармелад",
+        "type": "Городской",
+        "description": "Интервал 5-7 мин, с 06:00 до 22:30. Самый частый городской маршрут через Вторую Продольную",
+        "color": "#D84315",
+        "stops": [
+            {"name": "Ул. Кирова (Кировский район)", "lat": 48.5950, "lng": 44.4200},
+            {"name": "Горная Поляна", "lat": 48.6250, "lng": 44.4250},
+            {"name": "Обувная фабрика", "lat": 48.6720, "lng": 44.4600},
+            {"name": "СХИ (Аграрный университет)", "lat": 48.6850, "lng": 44.4690},
+            {"name": "Железнодорожный Вокзал", "lat": 48.7128, "lng": 44.5132},
+            {"name": "Ул. Землячки (7 Ветров)", "lat": 48.7550, "lng": 44.4950},
+            {"name": "ТРК «Мармелад» (конечная)", "lat": 48.7580, "lng": 44.4980}
+        ]
+    },
+    {
+        "id": "653",
+        "name": "653 Волгоград - Реконструкция",
+        "type": "Пригородный",
+        "description": "1 рейс в день, отправление ~12:00, время в пути ~3.5 ч. Трасса Р-22 «Каспий»",
+        "color": "#006C50",
+        "stops": [
+            {"name": "Центральный автовокзал Волгограда", "lat": 48.7126, "lng": 44.5126},
+            {"name": "р.п. Городище (трасса)", "lat": 48.8035, "lng": 44.4720},
+            {"name": "п. Самофаловка (трасса Р-22)", "lat": 49.0250, "lng": 44.2250},
+            {"name": "р.п. Иловля (поворот / трасса Р-22)", "lat": 49.3033, "lng": 43.9806},
+            {"name": "х. Ветютнев", "lat": 49.7800, "lng": 43.6500},
+            {"name": "г. Михайловка (автовокзал)", "lat": 50.0600, "lng": 43.2370},
+            {"name": "п. Реконструкция (конечная)", "lat": 50.3520, "lng": 44.1680}
+        ]
+    }
+]
+
+def build_osrm_polyline(stops):
+    """Query OSRM in chunks of stops to get high-res road geometry."""
+    full_polyline = []
+    
+    # Query segment by segment or small chunks to prevent URL length limits
+    for i in range(len(stops) - 1):
+        s1 = stops[i]
+        s2 = stops[i + 1]
+        coords_str = f"{s1['lng']},{s1['lat']};{s2['lng']},{s2['lat']}"
+        url = f"http://router.project-osrm.org/route/v1/driving/{coords_str}?overview=full&geometries=geojson"
+        
+        try:
+            r = requests.get(url, timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("routes"):
+                    pts = data["routes"][0]["geometry"]["coordinates"]
+                    # pts are [lng, lat]
+                    for p in pts:
+                        full_polyline.append({"lat": round(p[1], 6), "lng": round(p[0], 6)})
+            else:
+                # Fallback to direct connection if segment failed
+                full_polyline.append({"lat": s1["lat"], "lng": s1["lng"]})
+                full_polyline.append({"lat": s2["lat"], "lng": s2["lng"]})
+        except Exception as e:
+            print(f"Error routing segment {s1['name']} -> {s2['name']}: {e}")
+            full_polyline.append({"lat": s1["lat"], "lng": s1["lng"]})
+            full_polyline.append({"lat": s2["lat"], "lng": s2["lng"]})
+        
+        time.sleep(0.15)  # Rate limiting courtesy for public OSRM server
+    
+    # Deduplicate consecutive identical points
+    deduped = []
+    for pt in full_polyline:
+        if not deduped or (deduped[-1]["lat"] != pt["lat"] or deduped[-1]["lng"] != pt["lng"]):
+            deduped.append(pt)
+            
+    return deduped
+
+def main():
+    result_routes = []
+    for r in ROUTES:
+        print(f"Generating road geometry for {r['name']}...")
+        poly = build_osrm_polyline(r["stops"])
+        print(f"  -> Generated {len(poly)} precise road points!")
+        
+        route_data = {
+            "id": r["id"],
+            "name": r["name"],
+            "type": r["type"],
+            "description": r["description"],
+            "color": r["color"],
+            "stops": r["stops"],
+            "polyline": poly
+        }
+        result_routes.append(route_data)
+        
+    with open(r"c:\Users\David\Pictures\DOEDEM\assets\routes.json", "w", encoding="utf-8") as f:
+        json.dump(result_routes, f, ensure_ascii=False, indent=2)
+    print("\nSUCCESS! Successfully saved updated routes to assets/routes.json")
+
+if __name__ == "__main__":
+    main()
